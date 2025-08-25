@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Technical Job Tracker - Admin</title>
+    <title>Technical Job Tracker</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; }
         h1 { color: #333; text-align: center; }
@@ -47,7 +47,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database.js"></script>
 </head>
 <body>
-    <h1>Technical Job Tracker - Admin</h1>
+    <h1>Technical Job Tracker</h1>
 
     <h2>Add New Task</h2>
     <form id="taskForm">
@@ -344,7 +344,7 @@
                             <button class="btn-commented" onclick="updateStatus('${task.requestId}', 'Commented')" ${!isChecking ? 'disabled' : ''}>Commented</button>
                             <button class="btn-completed" onclick="updateStatus('${task.requestId}', 'Completed')" ${!isChecking ? 'disabled' : ''}>Completed</button>
                             <button class="btn-edit-note" onclick="editNotes('${task.requestId}')" ${!isHold ? 'disabled' : ''}>Edit Note</button>
-                            <button class="btn-move" onclick="moveToHistory('${task.requestId}')" ${!isCompleted ? 'disabled' : ''}>Move</button>
+                            <button class="btn-move" disabled>Move</button>  <!-- Disabled for tech -->
                         </td>
                     `;
                     activeTbody.appendChild(row);
@@ -383,32 +383,6 @@
             }
         }
 
-        // Add new task
-        document.getElementById('taskForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const requestId = document.getElementById('requestId').value.trim();
-            if (activeTasks.some(task => task.requestId === requestId)) {
-                alert('Request Code must be unique! This job already exists.');
-                return;
-            }
-            const task = {
-                requestId: requestId,
-                requestedBy: document.getElementById('requestedBy').value,
-                taskType: document.getElementById('taskType').value,
-                assignedTo: document.getElementById('assignedTo').value || 'Unassigned',
-                dueDate: document.getElementById('dueDate').value || null,
-                priority: document.getElementById('priority').value,
-                addedDate: new Date().toISOString().split('T')[0],
-                status: 'Pending',
-                notes: document.getElementById('notes').value,
-                statusTimes: { 'Pending': new Date().toISOString() }
-            };
-            activeTasks.push(task);
-            saveData();
-            renderTables();
-            e.target.reset();
-        });
-
         // Update status
         function updateStatus(requestId, newStatus) {
             const task = activeTasks.find(t => t.requestId === requestId);
@@ -442,18 +416,6 @@
                     saveData();
                     renderTables();
                 }
-            }
-        }
-
-        // Move to history
-        function moveToHistory(requestId) {
-            const taskIndex = activeTasks.findIndex(t => t.requestId === requestId);
-            if (taskIndex !== -1) {
-                const movedTask = { ...activeTasks[taskIndex], movedDate: new Date().toISOString().split('T')[0] };
-                jobHistory.push(movedTask);
-                activeTasks.splice(taskIndex, 1);
-                saveData();
-                renderTables();
             }
         }
 
