@@ -41,8 +41,14 @@
         .days-taken-light-red { background-color: #ffb6c1; } /* Light Red */
         .days-taken-red { background-color: #f44336; color: #fff; } /* Red */
         .days-taken-dark-red { background-color: #8b0000; color: #fff; } /* Dark Red */
+        .history-controls { margin-bottom: 10px; text-align: right; }
+        .history-toggle { background: #007bff; margin-right: 10px; }
+        .history-json { background: #28a745; }
+        .history-row { display: none; }
+        .history-row.expanded { display: table-row; }
+        .arrow { font-size: 18px; margin-right: 5px; }
     </style>
-    <!-- Firebase SDK -->
+    <!-- Firebase SDK (compat build for namespaced API) -->
     <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database-compat.js"></script>
 </head>
@@ -61,7 +67,6 @@
                 <option value="">Select...</option>
                 <option>Merwin</option>
                 <option>Jeeva</option>
-                <option>Udaya</option>
                 <option>Sachin</option>
                 <option>Kaveri</option>
                 <option>Pandu</option>
@@ -97,6 +102,7 @@
                 <option>Sheik</option>
                 <option>Harish</option>
                 <option>Fazil</option>
+                <option>Udaya</option>
             </select>
         </div>
         <div>
@@ -143,6 +149,7 @@
                 <option>Sheik</option>
                 <option>Harish</option>
                 <option>Fazil</option>
+                <option>Udaya</option>
             </select>
         </div>
         <div>
@@ -178,6 +185,10 @@
     </table>
 
     <h2>Job History</h2>
+    <div class="history-controls">
+        <button class="history-toggle" id="historyToggle" onclick="toggleHistory()">▶ Show More (Last 10 of <span id="totalHistory">0</span>)</button>
+        <button class="history-json" onclick="downloadHistoryAsJSON()">Download Full History JSON</button>
+    </div>
     <table id="jobHistory">
         <thead>
             <tr>
@@ -213,6 +224,7 @@
 
         let activeTasks = [];
         let jobHistory = [];
+        let showAllHistory = false;
         const today = new Date().toISOString().split('T')[0];
         const lastDateKey = 'lastSavedDate';
         const lastSavedDate = localStorage.getItem(lastDateKey);
@@ -230,6 +242,7 @@
             });
             db.ref('jobHistory').on('value', (snapshot) => {
                 jobHistory = snapshot.val() || [];
+                document.getElementById('totalHistory').textContent = jobHistory.length;
                 renderTables();
             });
         }
@@ -313,15 +326,13 @@
                     const isCompleted = task.status === 'Completed';
                     const isCommented = task.status === 'Commented';
 
-                    const assignedCell = task.assignedTo !== 'Unassigned' ? task.assignedTo : `
+                    // Always show dropdown for Assigned To, pre-select current
+                    const currentAssignee = task.assignedTo || 'Unassigned';
+                    const assignOptions = ['Unassigned', 'Santhosh', 'Mani', 'Dharanish', 'Sheik', 'Harish', 'Fazil', 'Udaya']
+                        .map(opt => `<option value="${opt}" ${opt === currentAssignee ? 'selected' : ''}>${opt}</option>`).join('');
+                    const assignedCell = `
                         <select class="assign-select" onchange="assignMember('${task.requestId}', this.value)">
-                            <option value="Unassigned" selected>Unassigned</option>
-                            <option>Santhosh</option>
-                            <option>Mani</option>
-                            <option>Dharanish</option>
-                            <option>Sheik</option>
-                            <option>Harish</option>
-                            <option>Fazil</option>
+                            ${assignOptions}
                         </select>
                     `;
 
@@ -350,12 +361,16 @@
                     activeTbody.appendChild(row);
                 });
 
-            // Job History
+            // Job History - Sort by movedDate desc, show last 10 by default
+            jobHistory.sort((a, b) => new Date(b.movedDate) - new Date(a.movedDate));
             const historyTbody = document.getElementById('jobHistory').querySelector('tbody');
             historyTbody.innerHTML = '';
-            jobHistory.forEach(task => {
+            const visibleCount = showAllHistory ? jobHistory.length : Math.min(10, jobHistory.length);
+            jobHistory.slice(0, visibleCount).forEach((task, index) => {
                 const statusTimesStr = Object.entries(task.statusTimes || {}).map(([status, time]) => `${status}: ${time}`).join('<br>');
                 const row = document.createElement('tr');
+                row.className = index >= 10 ? 'history-row' : ''; // Hide beyond 10 unless expanded
+                if (index >= 10) row.classList.add('expanded'); // Toggle class
                 row.innerHTML = `
                     <td>${task.requestId}</td>
                     <td>${task.requestedBy}</td>
@@ -371,12 +386,43 @@
                 `;
                 historyTbody.appendChild(row);
             });
+            updateToggleButton();
         }
 
-        // Assign member
+        function updateToggleButton() {
+            const button = document.getElementById('historyToggle');
+            const total = jobHistory.length;
+            if (total <= 10) {
+                button.style.display = 'none';
+                return;
+            }
+            const arrow = showAllHistory ? '▼' : '▶';
+            const text = showAllHistory ? 'Hide' : 'Show More';
+            button.innerHTML = `${arrow} ${text} (Last 10 of ${total})`;
+        }
+
+        function toggleHistory() {
+            showAllHistory = !showAllHistory;
+            renderTables(); // Re-render to toggle rows
+        }
+
+        // Download full history as JSON
+        function downloadHistoryAsJSON() {
+            if (jobHistory.length === 0) return;
+            const jsonStr = JSON.stringify(jobHistory, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `job_history_full_${today}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Assign member (now works anytime)
         function assignMember(requestId, newAssignee) {
             const task = activeTasks.find(t => t.requestId === requestId);
-            if (task && newAssignee !== 'Unassigned') {
+            if (task) {
                 task.assignedTo = newAssignee;
                 saveData();
                 renderTables();
@@ -484,4 +530,3 @@
     </script>
 </body>
 </html>
-
