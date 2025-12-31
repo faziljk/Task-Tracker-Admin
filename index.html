@@ -20,27 +20,27 @@
         .priority-urgent { background-color: #ffeb3b; color: #000; }
         .priority-within-today { background-color: #f44336; color: #fff; }
         .status-pending { background-color: #fff; }
-        .status-in-progress { background-color: #90ee90; } /* Light Green */
-        .status-checking { background-color: #add8e6; } /* Light Blue */
-        .status-completed { background-color: #008000; color: #fff; } /* Green */
-        .status-hold { background-color: #ffff00; } /* Yellow */
-        .status-commented { background-color: #ffb6c1; } /* Light Red */
+        .status-in-progress { background-color: #90ee90; }
+        .status-checking { background-color: #add8e6; }
+        .status-completed { background-color: #008000; color: #fff; }
+        .status-hold { background-color: #ffff00; }
+        .status-commented { background-color: #ffb6c1; }
         .actions button { margin-right: 3px; padding: 4px 8px; font-size: 12px; }
         .actions button:disabled { background: #ccc; cursor: not-allowed; color: #666; }
         .filters { display: flex; gap: 15px; margin-bottom: 15px; }
         .filters select { width: auto; font-size: 14px; padding: 6px; }
         form button { grid-column: span 2; justify-self: start; background: #4CAF50; }
-        .assign-select { width: auto; font-size: 12px; }
+        .assign-select, .priority-select, .due-date-input { width: auto; font-size: 12px; padding: 4px; }
         .btn-in-progress { background: #90ee90; color: #000; }
         .btn-hold { background: #ffff00; color: #000; }
         .btn-checking { background: #add8e6; color: #000; }
         .btn-commented { background: #ffb6c1; color: #000; }
         .btn-completed { background: #008000; }
-        .btn-edit-note { background: #ffc107; color: #000; } /* Orange for Edit Note */
-        .btn-move { background: #6c757d; } /* Gray for Move */
-        .days-taken-light-red { background-color: #ffb6c1; } /* Light Red */
-        .days-taken-red { background-color: #f44336; color: #fff; } /* Red */
-        .days-taken-dark-red { background-color: #8b0000; color: #fff; } /* Dark Red */
+        .btn-edit-note { background: #ffc107; color: #000; }
+        .btn-move { background: #6c757d; }
+        .days-taken-light-red { background-color: #ffb6c1; }
+        .days-taken-red { background-color: #f44336; color: #fff; }
+        .days-taken-dark-red { background-color: #8b0000; color: #fff; }
         .history-controls { margin-bottom: 10px; text-align: right; }
         .history-json { background: #28a745; }
         .arrow {
@@ -51,14 +51,10 @@
             color: #333;
             transition: transform 0.2s;
         }
-        .arrow:hover {
-            color: #007bff;
-        }
-        .arrow.expanded {
-            transform: rotate(90deg); /* Optional: rotates ▶ to point down on expand */
-        }
+        .arrow:hover { color: #007bff; }
+        .arrow.expanded { transform: rotate(90deg); }
     </style>
-    <!-- Firebase SDK (compat build for namespaced API) -->
+    <!-- Firebase SDK (compat) -->
     <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database-compat.js"></script>
 </head>
@@ -218,7 +214,6 @@
     </table>
 
     <script>
-        // Firebase Initialization
         const firebaseConfig = {
             apiKey: "AIzaSyAizaSyBugCDYleeDAX9BbGpoWoA67YDtQ-43zyk",
             authDomain: "tasktrackernew-e3917.firebaseapp.com",
@@ -233,7 +228,7 @@
 
         let activeTasks = [];
         let jobHistory = [];
-        let showHistory = false;  // Default: minimized
+        let showHistory = false;
         const today = new Date().toISOString().split('T')[0];
         const lastDateKey = 'lastSavedDate';
         const lastSavedDate = localStorage.getItem(lastDateKey);
@@ -243,7 +238,6 @@
         }
         localStorage.setItem(lastDateKey, today);
 
-        // Load data from Firebase
         function loadData() {
             db.ref('activeTasks').on('value', (snapshot) => {
                 activeTasks = snapshot.val() || [];
@@ -255,33 +249,28 @@
             });
         }
 
-        // Save data to Firebase
         function saveData() {
             db.ref('activeTasks').set(activeTasks);
             db.ref('jobHistory').set(jobHistory);
         }
 
-        // Calculate days between two dates
         function calculateDays(start, end) {
             if (!start || !end) return '-';
             const diff = new Date(end) - new Date(start);
             return Math.ceil(diff / (1000 * 60 * 60 * 24));
         }
 
-        // Get priority level for sorting
         function getPriorityLevel(priority) {
             if (priority === 'Within Today') return 3;
             if (priority === 'Urgent') return 2;
             return 1;
         }
 
-        // Render tables with filters and sorting
         function renderTables() {
             const filterStatus = document.getElementById('filterStatus').value;
             const filterAssignee = document.getElementById('filterAssignee').value;
             const filterPriority = document.getElementById('filterPriority').value;
 
-            // Sort active tasks: priority desc, then has dueDate (with dueDate first), then date asc
             activeTasks.sort((a, b) => {
                 const priA = getPriorityLevel(a.priority);
                 const priB = getPriorityLevel(b.priority);
@@ -289,14 +278,13 @@
 
                 const hasDueA = !!a.dueDate;
                 const hasDueB = !!b.dueDate;
-                if (hasDueA !== hasDueB) return hasDueB - hasDueA; // true (1) before false (0)
+                if (hasDueA !== hasDueB) return hasDueB - hasDueA;
 
                 const dateA = a.dueDate || a.addedDate;
                 const dateB = b.dueDate || b.addedDate;
                 return new Date(dateA) - new Date(dateB);
             });
 
-            // Active Tasks
             const activeTbody = document.getElementById('activeTasks').querySelector('tbody');
             activeTbody.innerHTML = '';
             activeTasks
@@ -312,18 +300,12 @@
 
                     let daysTakenClass = '';
                     if (daysTaken !== '-' && !isNaN(daysTaken)) {
-                        if (task.priority === 'Within Today' && daysTaken > 0) {
-                            daysTakenClass = 'days-taken-red';
-                        } else if (task.priority === 'Urgent' && daysTaken > 1) {
-                            daysTakenClass = 'days-taken-red';
-                        } else if (task.priority === 'Normal') {
-                            if (daysTaken > 5) {
-                                daysTakenClass = 'days-taken-dark-red';
-                            } else if (daysTaken > 2) {
-                                daysTakenClass = 'days-taken-red';
-                            } else if (daysTaken > 1) {
-                                daysTakenClass = 'days-taken-light-red';
-                            }
+                        if (task.priority === 'Within Today' && daysTaken > 0) daysTakenClass = 'days-taken-red';
+                        else if (task.priority === 'Urgent' && daysTaken > 1) daysTakenClass = 'days-taken-red';
+                        else if (task.priority === 'Normal') {
+                            if (daysTaken > 5) daysTakenClass = 'days-taken-dark-red';
+                            else if (daysTaken > 2) daysTakenClass = 'days-taken-red';
+                            else if (daysTaken > 1) daysTakenClass = 'days-taken-light-red';
                         }
                     }
 
@@ -334,15 +316,21 @@
                     const isCompleted = task.status === 'Completed';
                     const isCommented = task.status === 'Commented';
 
-                    // Always show dropdown for Assigned To, pre-select current
+                    // Editable Assigned To
                     const currentAssignee = task.assignedTo || 'Unassigned';
                     const assignOptions = ['Unassigned', 'Santhosh', 'Mani', 'Dharanish', 'Sheik', 'Harish', 'Fazil', 'Udaya']
                         .map(opt => `<option value="${opt}" ${opt === currentAssignee ? 'selected' : ''}>${opt}</option>`).join('');
-                    const assignedCell = `
-                        <select class="assign-select" onchange="assignMember('${task.requestId}', this.value)">
-                            ${assignOptions}
-                        </select>
-                    `;
+                    const assignedCell = `<select class="assign-select" onchange="updateField('${task.requestId}', 'assignedTo', this.value)">${assignOptions}</select>`;
+
+                    // Editable Due Date
+                    const dueDateCell = task.dueDate 
+                        ? `<input type="date" class="due-date-input" value="${task.dueDate}" onchange="updateField('${task.requestId}', 'dueDate', this.value)">`
+                        : `<input type="date" class="due-date-input" onchange="updateField('${task.requestId}', 'dueDate', this.value || null)">`;
+
+                    // Editable Priority
+                    const priorityOptions = ['Normal', 'Urgent', 'Within Today']
+                        .map(p => `<option value="${p}" ${p === task.priority ? 'selected' : ''}>${p}</option>`).join('');
+                    const priorityCell = `<select class="priority-select" onchange="updateField('${task.requestId}', 'priority', this.value)">${priorityOptions}</select>`;
 
                     row.innerHTML = `
                         <td class="${statusClass}">${task.requestId}</td>
@@ -350,10 +338,10 @@
                         <td class="${statusClass}">${task.taskType}</td>
                         <td class="${statusClass}">${assignedCell}</td>
                         <td class="${statusClass}">${task.addedDate}</td>
-                        <td class="${statusClass}">${task.dueDate || '-'}</td>
+                        <td class="${statusClass}">${dueDateCell}</td>
                         <td class="${statusClass} ${daysTakenClass}">${daysTaken}</td>
                         <td class="${statusClass}">${daysRemaining > 0 ? daysRemaining : (daysRemaining === '-' ? '-' : 'Overdue')}</td>
-                        <td class="${priorityClass}">${task.priority}</td>
+                        <td class="${priorityClass}">${priorityCell}</td>
                         <td class="${statusClass}">${task.status}</td>
                         <td class="${statusClass}">${task.notes}</td>
                         <td class="actions">
@@ -369,16 +357,13 @@
                     activeTbody.appendChild(row);
                 });
 
-            // Job History - Only render if expanded, cap at last 10
+            // Job History (collapsed by default, last 10 only when expanded)
             const historyTbody = document.getElementById('jobHistory').querySelector('tbody');
             historyTbody.innerHTML = '';
             if (showHistory && jobHistory.length > 0) {
-                // Sort by movedDate desc
-                const sortedHistory = [...jobHistory].sort((a, b) => new Date(b.movedDate) - new Date(a.movedDate));
-                // Show only last 10
-                const visibleHistory = sortedHistory.slice(0, 10);
-                visibleHistory.forEach(task => {
-                    const statusTimesStr = Object.entries(task.statusTimes || {}).map(([status, time]) => `${status}: ${time}`).join('<br>');
+                const sorted = [...jobHistory].sort((a, b) => new Date(b.movedDate) - new Date(a.movedDate));
+                sorted.slice(0, 10).forEach(task => {
+                    const statusTimesStr = Object.entries(task.statusTimes || {}).map(([s, t]) => `${s}: ${t}`).join('<br>');
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td>${task.requestId}</td>
@@ -396,7 +381,8 @@
                     historyTbody.appendChild(row);
                 });
             }
-            // Update table display and arrow
+
+            // Update history visibility and arrow
             const historyTable = document.getElementById('jobHistory');
             const arrow = document.querySelector('.arrow');
             if (showHistory) {
@@ -412,33 +398,25 @@
 
         function toggleHistory() {
             showHistory = !showHistory;
-            renderTables();  // Re-render to update rows and styles
+            renderTables();
         }
 
-        // Download full history as JSON
-        function downloadHistoryAsJSON() {
-            if (jobHistory.length === 0) return;
-            const jsonStr = JSON.stringify(jobHistory, null, 2);
-            const blob = new Blob([jsonStr], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `job_history_full_${today}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-        }
-
-        // Assign member (now works anytime)
-        function assignMember(requestId, newAssignee) {
+        // Generic field updater for Assigned To, Due Date, Priority
+        function updateField(requestId, field, value) {
             const task = activeTasks.find(t => t.requestId === requestId);
             if (task) {
-                task.assignedTo = newAssignee;
+                if (field === 'dueDate' && value === '') value = null;
+                task[field] = value;
                 saveData();
                 renderTables();
             }
         }
 
-        // Add new task
+        function assignMember(requestId, newAssignee) {
+            updateField(requestId, 'assignedTo', newAssignee);
+        }
+
+        // Rest of functions unchanged (add task, status, notes, move, CSV/JSON download, etc.)
         document.getElementById('taskForm').addEventListener('submit', (e) => {
             e.preventDefault();
             const requestId = document.getElementById('requestId').value.trim();
@@ -464,17 +442,13 @@
             e.target.reset();
         });
 
-        // Update status
         function updateStatus(requestId, newStatus) {
             const task = activeTasks.find(t => t.requestId === requestId);
             if (task) {
                 if (newStatus === 'Hold' && !task.notes) {
                     const reason = prompt('Please enter the reason for Hold:');
-                    if (reason) {
-                        task.notes = reason;
-                    } else {
-                        return; // Cancel if no reason
-                    }
+                    if (!reason) return;
+                    task.notes = reason;
                 }
                 task.status = newStatus;
                 task.statusTimes[newStatus] = new Date().toISOString();
@@ -483,7 +457,6 @@
             }
         }
 
-        // Edit notes
         function editNotes(requestId) {
             const task = activeTasks.find(t => t.requestId === requestId);
             if (task) {
@@ -500,25 +473,35 @@
             }
         }
 
-        // Move to history
         function moveToHistory(requestId) {
-            const taskIndex = activeTasks.findIndex(t => t.requestId === requestId);
-            if (taskIndex !== -1) {
-                const movedTask = { ...activeTasks[taskIndex], movedDate: new Date().toISOString().split('T')[0] };
-                jobHistory.push(movedTask);
-                activeTasks.splice(taskIndex, 1);
+            const idx = activeTasks.findIndex(t => t.requestId === requestId);
+            if (idx !== -1) {
+                const moved = { ...activeTasks[idx], movedDate: today };
+                jobHistory.push(moved);
+                activeTasks.splice(idx, 1);
                 saveData();
                 renderTables();
             }
         }
 
-        // Download history as CSV
+        function downloadHistoryAsJSON() {
+            if (jobHistory.length === 0) return;
+            const json = JSON.stringify(jobHistory, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `job_history_full_${today}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
         function downloadHistoryAsCSV() {
             if (jobHistory.length === 0) return;
             let csv = 'Request Code,Requested By,Task,Assigned To,Added Date,Due Date,Priority,Status,Note,Moved Date,Status Times\n';
             jobHistory.forEach(task => {
-                const statusTimesStr = Object.entries(task.statusTimes).map(([s, t]) => `${s}:${t}`).join('; ');
-                csv += `${task.requestId},${task.requestedBy},${task.taskType},${task.assignedTo},${task.addedDate},${task.dueDate || ''},${task.priority},${task.status},${task.notes.replace(/,/g, ';')},${task.movedDate},${statusTimesStr}\n`;
+                const times = Object.entries(task.statusTimes).map(([s, t]) => `${s}:${t}`).join('; ');
+                csv += `${task.requestId},${task.requestedBy},${task.taskType},${task.assignedTo},${task.addedDate},${task.dueDate || ''},${task.priority},${task.status},${task.notes.replace(/,/g, ';')},${task.movedDate},${times}\n`;
             });
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = URL.createObjectURL(blob);
@@ -529,12 +512,10 @@
             URL.revokeObjectURL(url);
         }
 
-        // Filter change listeners
         document.getElementById('filterStatus').addEventListener('change', renderTables);
         document.getElementById('filterAssignee').addEventListener('change', renderTables);
         document.getElementById('filterPriority').addEventListener('change', renderTables);
 
-        // Initial load
         loadData();
     </script>
 </body>
