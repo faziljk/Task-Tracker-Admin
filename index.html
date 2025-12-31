@@ -42,11 +42,21 @@
         .days-taken-red { background-color: #f44336; color: #fff; } /* Red */
         .days-taken-dark-red { background-color: #8b0000; color: #fff; } /* Dark Red */
         .history-controls { margin-bottom: 10px; text-align: right; }
-        .history-toggle { background: #007bff; margin-right: 10px; }
         .history-json { background: #28a745; }
-        .history-row { display: none; }
-        .history-row.expanded { display: table-row; }
-        .arrow { font-size: 18px; margin-right: 5px; }
+        .arrow {
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-left: 10px;
+            color: #333;
+            transition: transform 0.2s;
+        }
+        .arrow:hover {
+            color: #007bff;
+        }
+        .arrow.expanded {
+            transform: rotate(90deg); /* Optional: rotates ▶ to point down on expand */
+        }
     </style>
     <!-- Firebase SDK (compat build for namespaced API) -->
     <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -184,9 +194,8 @@
         <tbody></tbody>
     </table>
 
-    <h2>Job History</h2>
+    <h2>Job History <span class="arrow" onclick="toggleHistory()">▶</span></h2>
     <div class="history-controls">
-        <button class="history-toggle" id="historyToggle" onclick="toggleHistory()">▶ Show More (Last 10 of <span id="totalHistory">0</span>)</button>
         <button class="history-json" onclick="downloadHistoryAsJSON()">Download Full History JSON</button>
     </div>
     <table id="jobHistory">
@@ -224,7 +233,7 @@
 
         let activeTasks = [];
         let jobHistory = [];
-        let showAllHistory = false;
+        let showHistory = false;  // Default: minimized
         const today = new Date().toISOString().split('T')[0];
         const lastDateKey = 'lastSavedDate';
         const lastSavedDate = localStorage.getItem(lastDateKey);
@@ -242,7 +251,6 @@
             });
             db.ref('jobHistory').on('value', (snapshot) => {
                 jobHistory = snapshot.val() || [];
-                document.getElementById('totalHistory').textContent = jobHistory.length;
                 renderTables();
             });
         }
@@ -361,53 +369,50 @@
                     activeTbody.appendChild(row);
                 });
 
-        // Job History - Sort by movedDate desc, always render all but hide extras when collapsed
-jobHistory.sort((a, b) => new Date(b.movedDate) - new Date(a.movedDate));
-const historyTbody = document.getElementById('jobHistory').querySelector('tbody');
-historyTbody.innerHTML = '';
-jobHistory.forEach((task, index) => {
-    const statusTimesStr = Object.entries(task.statusTimes || {}).map(([status, time]) => `${status}: ${time}`).join('<br>');
-    const row = document.createElement('tr');
-    
-    // Hide extras (index >=10) only when collapsed
-    if (!showAllHistory && index >= 10) {
-        row.classList.add('history-row'); // display: none via CSS
-    }
-    // No class needed for visible rows (default display: table-row)
-    
-    row.innerHTML = `
-        <td>${task.requestId}</td>
-        <td>${task.requestedBy}</td>
-        <td>${task.taskType}</td>
-        <td>${task.assignedTo}</td>
-        <td>${task.addedDate}</td>
-        <td>${task.dueDate || '-'}</td>
-        <td>${task.priority}</td>
-        <td>${task.status}</td>
-        <td>${task.notes}</td>
-        <td>${task.movedDate}</td>
-        <td>${statusTimesStr}</td>
-    `;
-    historyTbody.appendChild(row);
-});
-updateToggleButton();
-        }
-
-        function updateToggleButton() {
-            const button = document.getElementById('historyToggle');
-            const total = jobHistory.length;
-            if (total <= 10) {
-                button.style.display = 'none';
-                return;
+            // Job History - Only render if expanded, cap at last 10
+            const historyTbody = document.getElementById('jobHistory').querySelector('tbody');
+            historyTbody.innerHTML = '';
+            if (showHistory && jobHistory.length > 0) {
+                // Sort by movedDate desc
+                const sortedHistory = [...jobHistory].sort((a, b) => new Date(b.movedDate) - new Date(a.movedDate));
+                // Show only last 10
+                const visibleHistory = sortedHistory.slice(0, 10);
+                visibleHistory.forEach(task => {
+                    const statusTimesStr = Object.entries(task.statusTimes || {}).map(([status, time]) => `${status}: ${time}`).join('<br>');
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${task.requestId}</td>
+                        <td>${task.requestedBy}</td>
+                        <td>${task.taskType}</td>
+                        <td>${task.assignedTo}</td>
+                        <td>${task.addedDate}</td>
+                        <td>${task.dueDate || '-'}</td>
+                        <td>${task.priority}</td>
+                        <td>${task.status}</td>
+                        <td>${task.notes}</td>
+                        <td>${task.movedDate}</td>
+                        <td>${statusTimesStr}</td>
+                    `;
+                    historyTbody.appendChild(row);
+                });
             }
-            const arrow = showAllHistory ? '▼' : '▶';
-            const text = showAllHistory ? 'Hide' : 'Show More';
-            button.innerHTML = `${arrow} ${text} (Last 10 of ${total})`;
+            // Update table display and arrow
+            const historyTable = document.getElementById('jobHistory');
+            const arrow = document.querySelector('.arrow');
+            if (showHistory) {
+                historyTable.style.display = 'table';
+                arrow.textContent = '▼';
+                arrow.classList.add('expanded');
+            } else {
+                historyTable.style.display = 'none';
+                arrow.textContent = '▶';
+                arrow.classList.remove('expanded');
+            }
         }
 
         function toggleHistory() {
-            showAllHistory = !showAllHistory;
-            renderTables(); // Re-render to toggle rows
+            showHistory = !showHistory;
+            renderTables();  // Re-render to update rows and styles
         }
 
         // Download full history as JSON
@@ -534,4 +539,3 @@ updateToggleButton();
     </script>
 </body>
 </html>
-
